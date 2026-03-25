@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+  web-gateway:
+    build: ./services/web-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - ORDER_SERVICE_URL=http://order-service:8081
+      - WAREHOUSE_API_URL=http://warehouse-api:8083
+      - AUTH_SERVICE_URL=http://auth-service:8086
+      - RATE_LIMIT_RPM=120
+      - LOG_LEVEL=INFO
+    depends_on:
+      - order-service
+      - warehouse-api
+      - auth-service
+
+  order-service:
+    build: ./services/order-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders
+      - REDIS_URL=redis://inventory-cache:6379/0
+      - FULFILLMENT_QUEUE_URL=sqs://fulfillment-queue
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - inventory-cache
+
+  fulfillment-engine:
+    build: ./services/fulfillment-engine
+    ports:
+      - "8082:8082"
+    environment:
+      - REDIS_URL=redis://inventory-cache:6379/0
+      - FULFILLMENT_QUEUE_URL=sqs://fulfillment-queue
+      - QUEUE_BATCH_SIZE=50
+      - PROCESSING_INTERVAL_MS=500
+      - LOG_LEVEL=INFO
+    depends_on:
+      - inventory-cache
+
+  warehouse-api:
+    build: ./services/warehouse-api
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://warehouse:warehouse@postgres:5432/inventory
+      - REDIS_URL=redis://inventory-cache:6379/0
+      - BATCH_SIZE=50
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - inventory-cache
+
+  notification-service:
+    build: ./services/notification-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=orders@shelflife.io
+      - LOG_LEVEL=INFO
+
+  analytics-service:
+    build: ./services/analytics-service
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgresql://analytics:analytics@postgres:5432/analytics
+      - BUFFER_MAX_SIZE=10000
+      - FLUSH_INTERVAL_SECONDS=30
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "8086:8086"
+    environment:
+      - JWT_SECRET=local-dev-secret-change-in-prod
+      - DATABASE_URL=postgresql://auth:auth@postgres:5432/auth
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+
+  scheduler-service:
+    build: ./services/scheduler-service
+    ports:
+      - "8087:8087"
+    environment:
+      - JOBS_FILE=/app/config/jobs.yaml
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./infra/scheduler:/app/config:ro
+
+  inventory-cache:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy noeviction
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=shelflife
+      - POSTGRES_PASSWORD=shelflife
+      - POSTGRES_DB=shelflife
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/seed-db.sh:/docker-entrypoint-initdb.d/seed.sh
+
+volumes:
+  pgdata:

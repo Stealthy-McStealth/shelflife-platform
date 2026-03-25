@@ -1,0 +1,78 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push images
+        run: |
+          for svc in web-gateway order-service fulfillment-engine warehouse-api notification-service analytics-service auth-service scheduler-service; do
+            echo "Building $svc..."
+            docker build -t $ECR_REGISTRY/shelflife/$svc:${{ github.sha }} \
+                         -t $ECR_REGISTRY/shelflife/$svc:latest \
+                         services/$svc/
+            docker push $ECR_REGISTRY/shelflife/$svc:${{ github.sha }}
+            docker push $ECR_REGISTRY/shelflife/$svc:latest
+          done
+
+      - name: Update ECS services
+        run: |
+          CLUSTER="shelflife-${{ github.event.inputs.environment || 'production' }}"
+          for svc in web-gateway order-service fulfillment-engine warehouse-api notification-service analytics-service auth-service scheduler-service; do
+            echo "Deploying $svc..."
+            aws ecs update-service \
+              --cluster $CLUSTER \
+              --service $svc \
+              --force-new-deployment \
+              --region ${{ env.AWS_REGION }}
+          done
+
+      - name: Wait for stable deployment
+        run: |
+          CLUSTER="shelflife-${{ github.event.inputs.environment || 'production' }}"
+          for svc in web-gateway order-service fulfillment-engine warehouse-api; do
+            echo "Waiting for $svc to stabilize..."
+            aws ecs wait services-stable \
+              --cluster $CLUSTER \
+              --services $svc \
+              --region ${{ env.AWS_REGION }}
+          done
+
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "Deployment complete: ${{ github.sha }}"

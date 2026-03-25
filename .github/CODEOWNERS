@@ -1,0 +1,24 @@
+# Platform team owns all infrastructure and shared configuration
+* @shelflife/platform-eng
+
+# Service-specific ownership
+services/order-service/ @shelflife/orders-team
+services/fulfillment-engine/ @shelflife/fulfillment-team
+services/warehouse-api/ @shelflife/warehouse-team
+services/web-gateway/ @shelflife/platform-eng
+services/notification-service/ @shelflife/platform-eng
+services/analytics-service/ @shelflife/data-team
+services/auth-service/ @shelflife/platform-eng
+services/scheduler-service/ @shelflife/platform-eng
+services/inventory-cache/ @shelflife/platform-eng
+
+# Infrastructure requires platform-eng review
+infra/ @shelflife/platform-eng
+docker-compose.yml @shelflife/platform-eng
+Makefile @shelflife/platform-eng
+
+# CI/CD configuration
+.github/ @shelflife/platform-eng
+
+# Documentation
+docs/ @shelflife/platform-eng

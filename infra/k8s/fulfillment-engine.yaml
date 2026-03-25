@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fulfillment-engine
+  namespace: shelflife
+  labels:
+    app: fulfillment-engine
+    team: platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fulfillment-engine
+  template:
+    metadata:
+      labels:
+        app: fulfillment-engine
+    spec:
+      containers:
+        - name: fulfillment-engine
+          image: shelflife/fulfillment-engine:latest
+          ports:
+            - containerPort: 8082
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: shelflife-secrets
+                  key: redis-url
+            - name: FULFILLMENT_QUEUE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: shelflife-config
+                  key: fulfillment-queue-url
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fulfillment-engine
+  namespace: shelflife
+spec:
+  selector:
+    app: fulfillment-engine
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: ClusterIP

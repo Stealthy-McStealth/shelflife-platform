@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler-service
+  namespace: shelflife
+  labels:
+    app: scheduler-service
+    team: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scheduler-service
+  template:
+    metadata:
+      labels:
+        app: scheduler-service
+    spec:
+      containers:
+        - name: scheduler-service
+          image: shelflife/scheduler-service:latest
+          ports:
+            - containerPort: 8087
+          env:
+            - name: JOBS_FILE
+              value: "/app/config/jobs.yaml"
+            - name: LOG_LEVEL
+              value: "INFO"
+          volumeMounts:
+            - name: jobs-config
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            requests:
+              cpu: 128m
+              memory: 128Mi
+            limits:
+              cpu: 256m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8087
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8087
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: jobs-config
+          configMap:
+            name: scheduler-jobs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduler-service
+  namespace: shelflife
+spec:
+  selector:
+    app: scheduler-service
+  ports:
+    - port: 8087
+      targetPort: 8087
+  type: ClusterIP

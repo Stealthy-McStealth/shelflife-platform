@@ -1,0 +1,39 @@
+# Scheduled tasks for ShelfLife platform
+# Managed by scheduler-service. Changes require deploy.
+
+jobs:
+  - name: order-cleanup
+    schedule: "0 3 * * *"
+    command: shelflife-jobs
+    args:
+      - cleanup
+      - --source order-db
+      - --type delete-expired
+      - --older-than 90d
+    timeout: 300s
+    alert_on_failure: true
+    description: "Remove expired/cancelled orders older than 90 days"
+
+  - name: analytics-rollup
+    schedule: "0 * * * *"
+    command: shelflife-jobs
+    args:
+      - rollup
+      - --source analytics-events
+      - --target analytics-db
+      - --type aggregate
+    timeout: 60s
+    alert_on_failure: true
+    description: "Hourly aggregation of raw analytics events"
+
+  - name: health-check-sweep
+    schedule: "*/5 * * * *"
+    command: shelflife-jobs
+    args:
+      - health
+      - --source all-services
+      - --target status-page
+      - --type ping
+    timeout: 30s
+    alert_on_failure: true
+    description: "Sweep all service health endpoints"

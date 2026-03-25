@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-gateway
+  namespace: shelflife
+  labels:
+    app: web-gateway
+    team: platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-gateway
+  template:
+    metadata:
+      labels:
+        app: web-gateway
+    spec:
+      containers:
+        - name: web-gateway
+          image: shelflife/web-gateway:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ORDER_SERVICE_URL
+              value: "http://order-service:8081"
+            - name: WAREHOUSE_API_URL
+              value: "http://warehouse-api:8083"
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:8086"
+            - name: RATE_LIMIT_RPM
+              value: "120"
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-gateway
+  namespace: shelflife
+spec:
+  selector:
+    app: web-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: LoadBalancer
