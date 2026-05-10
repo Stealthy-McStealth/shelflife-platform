@@ -2,6 +2,54 @@
 # Managed by scheduler-service. Changes require deploy.
 
 jobs:
+  - name: inventory-sync
+    schedule: "*/30 * * * *"
+    command: shelflife-jobs
+    args:
+      - sync
+      - --source warehouse-db
+      - --target inventory-cache
+      - --type full-refresh
+    timeout: 120s
+    alert_on_failure: false
+    description: "Periodic full refresh of inventory cache from warehouse DB"
+
+  - name: report-daily-summary
+    schedule: "0 6 * * *"
+    command: shelflife-jobs
+    args:
+      - report
+      - --source analytics-db
+      - --target email
+      - --type daily-summary
+    timeout: 300s
+    alert_on_failure: false
+    description: "Daily summary report sent to ops team"
+
+  - name: cache-warmup-legacy
+    schedule: "0 5 * * *"
+    command: shelflife-jobs
+    args:
+      - warmup
+      - --source warehouse-db
+      - --target inventory-cache
+      - --type lazy-load
+    timeout: 600s
+    alert_on_failure: false
+    description: "Legacy cache warmup (deprecated - lazy loading handles this now)"
+
+  - name: metrics-rollup-hourly
+    schedule: "0 * * * *"
+    command: shelflife-jobs
+    args:
+      - rollup
+      - --source metrics-raw
+      - --target metrics-db
+      - --type aggregate
+    timeout: 120s
+    alert_on_failure: false
+    description: "Hourly metrics rollup (replaced by analytics-service aggregation)"
+
   - name: order-cleanup
     schedule: "0 3 * * *"
     command: shelflife-jobs
