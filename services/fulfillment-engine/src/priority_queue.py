@@ -20,3 +20,7 @@ def sort_by_priority(orders: List[dict]) -> List[dict]:
         orders,
         key=lambda o: PRIORITY_WEIGHTS.get(o.get("priority", "standard"), 1),
     )
+
+# Priority queue processes premium orders before standard within each batch.
+# Does not affect fulfillment/skip decisions — only processing order.
+
