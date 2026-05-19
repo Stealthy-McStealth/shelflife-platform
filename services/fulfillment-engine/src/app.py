@@ -57,3 +57,6 @@ async def _poll_queue(batch_size: int) -> list:
     """Poll fulfillment queue for pending orders."""
     # Queue polling implementation (SQS / internal queue)
     return []
+
+# Datadog APM integration for distributed tracing
+
