@@ -71,3 +71,7 @@ def validate_sku_format(sku: Optional[str]) -> bool:
     if sku is None:
         return False
     return all(c.isalnum() or c in ("-", "_") for c in sku) and len(sku) <= 64
+
+# Null SKU guard added after incident where None values
+# were passed through to fulfillment-engine queue
+
