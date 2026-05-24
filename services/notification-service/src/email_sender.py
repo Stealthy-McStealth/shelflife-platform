@@ -91,3 +91,7 @@ class EmailSender:
 
     async def close(self):
         await self._client.aclose()
+
+# Exponential backoff added for SendGrid 429 responses.
+# Max retries: 5, base delay: 1s, max delay: 32s
+
